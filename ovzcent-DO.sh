@@ -4,6 +4,16 @@ echo 'Going to install OpenVZ for you..'
 yum update -y
 yum install -y wget 
 
+echo 'adding swap'
+dd if=/dev/zero of=/swapfile bs=1024 count=512k
+mkswap /swapfile
+swapon /swapfile
+echo  '/swapfile          swap            swap    defaults        0 0' >> /etc/fstab
+chown root:root /swapfile 
+chmod 0600 /swapfile
+sysctl vm.swappiness=20
+echo 'vm.swappiness=20' >> /etc/sysctl.conf
+ I
 echo 'now adding openvz Repo'
 cd /etc/yum.repos.d
 wget http://download.openvz.org/openvz.repo
@@ -33,19 +43,22 @@ sed -i 's/SELINUX=enabled/SELINUX=disabled/g' /etc/sysconfig/selinux
 
 echo 'Downloading few OVZ templates from: http://wiki.openvz.org/Download/template/precreated'
 cd /vz/template/cache
-wget http://download.openvz.org/template/precreated/centos-6-x86_64.tar.gz
-wget http://download.openvz.org/template/precreated/debian-7.0-x86_64.tar.gz
 wget http://download.openvz.org/template/precreated/contrib/debian-7.0-amd64-minimal.tar.gz
-wget http://download.openvz.org/template/precreated/ubuntu-13.04-x86_64.tar.gz
 
 echo 'Finishing installation'
 yum install -y ntp
 ntpdate -u us.pool.ntp.org
 chkconfig ntpd on
-service iptables stop
+service iptables stoplets
 service ip6tables stop
 chkconfig iptables off
 chkconfig ip6tables off
 
-echo 'Installation is now finished server will be rebooted...'
-reboot
+echo 'installing kernel tools'
+yum update kernel*
+yum install -y kexec-tools
+
+latestkernel=`ls -t /boot/vmlinuz-* | sed "s/\/boot\/vmlinuz-//g" | head -n1` 
+echo $latestkernel 
+kexec -l /boot/vmlinuz-${latestkernel} --initrd=/boot/initramfs-${latestkernel}.img --append="`cat /proc/cmdline`"
+kexec -e
